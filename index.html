@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tick Tock It's Funan O'Clock</title>
+    <style>
+        body {
+            background: black;
+        }
+
+        canvas {
+            padding-top: 10px;
+            cursor: pointer;
+        }
+
+        #container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #instructions {
+            padding-top: 10px;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <audio id="tick" src="audio/tick.mp3"></audio>
+    <audio id="tock" src="audio/tock.mp3"></audio>
+    <div id="container">
+        <canvas id="c" width="500" height="680"></canvas>
+        <span id="instructions">
+            Click the clock to unmute/mute it. Headphones work best.
+        </span>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            //
+            // (☞ﾟ∀ﾟ)☞
+            // don't read any of this you'll only judge me!
+            //
+            const cvs = document.getElementById('c');
+            const ctx = cvs.getContext('2d');
+            const DisplayWidth = cvs.width;
+            const DisplayHeight = cvs.height;
+            const TileWidth = 20;
+            const TileHeight = 20;
+            const TickerWidth = 4;
+            const TickerHeight = 16;
+            const NumberOfColumns = Math.floor(DisplayWidth / TileWidth);
+            const NumberOfRows = Math.floor(DisplayHeight / TileHeight);
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const tickElement = document.getElementById('tick');
+            const tockElement = document.getElementById('tock');
+            let isMuted = true; // autoplay is disabled by default
+
+            let audioCtx = null;
+            let panner = null;
+
+            const digits = [
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 0, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 0, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 0, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 0, 0, 0, 0, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 0, 0, 0, 0, 0, 1, 1],
+                    [1, 1, 1, 0, 0, 0, 0, 1, 1, 1],
+                    [1, 1, 0, 0, 0, 0, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 0, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 1, 0, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 0, 0, 1, 1],
+                    [0, 1, 1, 1, 1, 0, 0, 0, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 0, 0, 0, 0, 1, 1, 0],
+                    [1, 1, 1, 0, 0, 0, 0, 1, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 0, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+                    [0, 0, 1, 1, 1, 1, 1, 1, 1, 0],
+                    [1, 1, 1, 1, 1, 0, 0, 1, 1, 0],
+                    [1, 1, 1, 0, 0, 0, 0, 1, 1, 0],
+                    [1, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 0, 0, 1, 1, 0],
+                    [1, 1, 1, 1, 1, 0, 0, 1, 1, 1],
+                    [1, 1, 0, 1, 1, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 1, 1, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 1, 1, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 1, 1, 0, 0, 0, 1, 1],
+                    [1, 1, 0, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 0],
+                    [0, 0, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 1, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 0, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                    [1, 1, 0, 0, 0, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 1, 1, 1, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 1, 0, 1, 1, 1, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 0, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 0, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 0, 1, 1, 1],
+                    [1, 1, 0, 0, 1, 1, 1, 1, 1, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ]
+            ]; // 0 to 9
+
+            // A, P and M
+            const characters = {
+                'A': [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 1, 1, 0, 0],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+                ],
+                'A_ALT': [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 1, 1, 0, 0],
+                    [1, 1, 1, 1, 0, 0, 1, 1, 0, 0],
+                    [0, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+                ],
+                'P': [
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 0, 0, 0, 1, 1, 0, 0, 0],
+                    [1, 1, 0, 0, 0, 1, 1, 0, 0, 0],
+                    [1, 1, 0, 0, 0, 1, 1, 0, 0, 0],
+                    [1, 1, 0, 0, 0, 1, 1, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                ],
+                'M': [
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 0, 1, 1, 1, 0, 0, 0],
+                    [0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                ]
+            };
+
+            let currentTickerAngle = 0;
+            // 0 to 360 in 6 degree increments
+            // 0 to 59 second slots
+            const angles = [
+                0.0,
+                0.10471975511965977,
+                0.20943951023931953,
+                0.3141592653589793,
+                0.41887902047863906,
+                0.5235987755982988,
+                0.6283185307179586,
+                0.7330382858376184,
+                0.8377580409572782,
+                0.942477796076938,
+                1.0471975511965979,
+                1.1519173063162575,
+                1.2566370614359172,
+                1.361356816555577,
+                1.4660765716752366,
+                1.5707963267948963,
+                1.675516081914556,
+                1.7802358370342157,
+                1.8849555921538754,
+                1.9896753472735351,
+                2.094395102393195,
+                2.1991148575128547,
+                2.3038346126325147,
+                2.4085543677521746,
+                2.5132741228718345,
+                2.6179938779914944,
+                2.7227136331111543,
+                2.8274333882308142,
+                2.932153143350474,
+                3.036872898470134,
+                3.141592653589794,
+                3.246312408709454,
+                3.351032163829114,
+                3.4557519189487738,
+                3.5604716740684337,
+                3.6651914291880936,
+                3.7699111843077535,
+                3.8746309394274134,
+                3.9793506945470734,
+                4.084070449666733,
+                4.188790204786392,
+                4.293509959906052,
+                4.398229715025711,
+                4.502949470145371,
+                4.60766922526503,
+                4.71238898038469,
+                4.817108735504349,
+                4.921828490624009,
+                5.026548245743668,
+                5.131268000863328,
+                5.235987755982987,
+                5.3407075111026465,
+                5.445427266222306,
+                5.5501470213419655,
+                5.654866776461625,
+                5.759586531581284,
+                5.864306286700944,
+                5.969026041820603,
+                6.073745796940263,
+                6.178465552059922
+            ];
+
+            const pannerPositions = [{
+                    x: 0.0,
+                    y: 50.0
+                },
+                {
+                    x: 5.226561069488525,
+                    y: 49.726097106933594
+                },
+                {
+                    x: 10.395724296569824,
+                    y: 48.90736770629883
+                },
+                //
+                {
+                    x: 15.45085620880127,
+                    y: 47.55282211303711
+                },
+                {
+                    x: 20.33683967590332,
+                    y: 45.677268981933594
+                },
+                {
+                    x: 25.000009536743164,
+                    y: 43.301265716552734
+                },
+                {
+                    x: 29.389272689819336,
+                    y: 40.450843811035156
+                },
+                {
+                    x: 33.45654296875,
+                    y: 37.15723419189453
+                },
+                {
+                    x: 37.15725326538086,
+                    y: 33.456520080566406
+                },
+                {
+                    x: 40.450862884521484,
+                    y: 29.389249801635742
+                },
+                {
+                    x: 43.30128479003906,
+                    y: 24.999984741210938
+                },
+                {
+                    x: 45.67728805541992,
+                    y: 20.33681297302246
+                },
+                {
+                    x: 47.55284118652344,
+                    y: 15.450826644897461
+                },
+                {
+                    x: 48.90739440917969,
+                    y: 10.395557403564453
+                },
+                {
+                    x: 49.726104736328125,
+                    y: 5.2263922691345215
+                },
+                {
+                    x: 50.00000762939453,
+                    y: -0.00003401095455046743
+                },
+                {
+                    x: 49.726097106933594,
+                    y: -5.226459980010986
+                },
+                {
+                    x: 48.907379150390625,
+                    y: -10.395623207092285
+                },
+                {
+                    x: 47.552818298339844,
+                    y: -15.45089054107666
+                },
+                {
+                    x: 45.67726135253906,
+                    y: -20.33687400817871
+                },
+                {
+                    x: 43.30125427246094,
+                    y: -25.000041961669922
+                },
+                {
+                    x: 40.450828552246094,
+                    y: -29.389305114746094
+                },
+                {
+                    x: 37.1572151184082,
+                    y: -33.456573486328125
+                },
+                {
+                    x: 33.45649719238281,
+                    y: -37.157283782958984
+                },
+                {
+                    x: 29.389223098754883,
+                    y: -40.450889587402344
+                },
+                {
+                    x: 24.999954223632812,
+                    y: -43.301307678222656
+                },
+                {
+                    x: 20.336780548095703,
+                    y: -45.67730712890625
+                },
+                {
+                    x: 15.45079231262207,
+                    y: -47.5528564453125
+                },
+                {
+                    x: 10.395522117614746,
+                    y: -48.907405853271484
+                },
+                {
+                    x: 5.226356029510498,
+                    y: -49.726112365722656
+                },
+                {
+                    x: -0.00007084954268066213,
+                    y: -50.0000114440918
+                },
+                {
+                    x: -5.226497173309326,
+                    y: -49.726097106933594
+                },
+                {
+                    x: -10.395660400390625,
+                    y: -48.90737533569336
+                },
+                {
+                    x: -15.450926780700684,
+                    y: -47.55281066894531
+                },
+                {
+                    x: -20.3369083404541,
+                    y: -45.677249908447266
+                },
+                {
+                    x: -25.00007438659668,
+                    y: -43.301239013671875
+                },
+                {
+                    x: -29.38933563232422,
+                    y: -40.450809478759766
+                },
+                {
+                    x: -33.456600189208984,
+                    y: -37.15719223022461
+                },
+                {
+                    x: -37.15730667114258,
+                    y: -33.45647430419922
+                },
+                {
+                    x: -40.45090866088867,
+                    y: -29.389198303222656
+                },
+                {
+                    x: -43.30132293701172,
+                    y: -24.999927520751953
+                },
+                {
+                    x: -45.67731857299805,
+                    y: -20.33675193786621
+                },
+                {
+                    x: -47.55286407470703,
+                    y: -15.450762748718262
+                },
+                {
+                    x: -48.90740966796875,
+                    y: -10.395491600036621
+                },
+                {
+                    x: -49.72611618041992,
+                    y: -5.226325511932373
+                },
+                {
+                    x: -50.0000114440918,
+                    y: 0.00010159868543269113
+                },
+                {
+                    x: -49.726097106933594,
+                    y: 5.226527690887451
+                },
+                {
+                    x: -48.907371520996094,
+                    y: 10.39569091796875
+                },
+                {
+                    x: -47.55280685424805,
+                    y: 15.450956344604492
+                },
+                {
+                    x: -45.677242279052734,
+                    y: 20.336938858032227
+                },
+                {
+                    x: -43.30122756958008,
+                    y: 25.000104904174805
+                },
+                {
+                    x: -40.4507942199707,
+                    y: 29.38936424255371
+                },
+                {
+                    x: -37.15717315673828,
+                    y: 33.456626892089844
+                },
+                {
+                    x: -33.456451416015625,
+                    y: 37.15733337402344
+                },
+                {
+                    x: -29.38917350769043,
+                    y: 40.45093536376953
+                },
+                {
+                    x: -24.999900817871094,
+                    y: 43.30134582519531
+                },
+                {
+                    x: -20.33672332763672,
+                    y: 45.677337646484375
+                },
+                {
+                    x: -15.450732231140137,
+                    y: 47.552879333496094
+                },
+                {
+                    x: -10.39546012878418,
+                    y: 48.90742111206055
+                },
+                {
+                    x: -5.226293087005615,
+                    y: 49.72612380981445
+                }
+            ];
+
+            function resetGrid() {
+                for (var col_x = 0; col_x < NumberOfColumns; col_x++) {
+                    for (var row_y = 0; row_y < NumberOfRows; row_y++) {
+                        grid[col_x][row_y] = 0;
+                    }
+                }
+            }
+
+            function manageAudio() {
+                // User must interact with the page
+                isMuted = !isMuted;
+                if (audioCtx == null) {
+                    audioSetup();
+                }
+
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }
+
+            cvs.addEventListener('click', manageAudio, false);
+            cvs.addEventListener('touchend', manageAudio, false);
+
+            function audioSetup() {
+                audioCtx = new AudioContext();
+                let listener = audioCtx.listener;
+
+                // Firefox check
+                if (listener.positionX) {
+                    // set up the listener's position
+                    listener.positionX.value = 0;
+                    listener.positionY.value = 0;
+                    listener.positionZ.value = 25; // slightly in front
+                } else {
+                    listener.setPosition(0, 0, 25);
+                }
+
+                // Firefox check
+                if (listener.forwardX) {
+                    // the direction the listener is facing
+                    // i.e. straight ahead
+                    listener.forwardX.value = 0;
+                    listener.forwardY.value = 0;
+                    listener.forwardZ.value = -1;
+
+                    listener.upX.value = 0;
+                    listener.upY.value = 1;
+                    listener.upZ.value = 0;
+
+                } else {
+                    listener.setOrientation(0, 0, -1, 0, 1, 0);
+                }
+
+                let tickTrack = audioCtx.createMediaElementSource(tickElement);
+                let tockTrack = audioCtx.createMediaElementSource(tockElement);
+
+                let gainNode = audioCtx.createGain();
+
+                const pannerOptions = {
+                    panningModel: 'HRTF',
+                    distanceModel: 'linear',
+                    positionX: 0,
+                    positionY: 0,
+                    positionZ: 50,
+                    orientationX: 0.0,
+                    orientationY: 0.0,
+                    orientationZ: -1.0, // 1.0 would face into page, -1.0 faces out
+                    refDistance: 1,
+                    maxDistance: 10000,
+                    // how quickly the volume reduces as the panner moves away from the listener
+                    rolloffFactor: 10,
+                    coneInnerAngle: 360, // degrees
+                    coneOuterAngle: 360, // degrees
+                    coneOuterGain: 0
+                };
+
+                panner = new PannerNode(audioCtx, pannerOptions)
+                tockTrack.connect(gainNode).connect(panner).connect(audioCtx.destination);
+                tickTrack.connect(gainNode).connect(panner).connect(audioCtx.destination);
+            }
+
+            let tickers = [];
+
+            function visualSetup() {
+                tickers = [];
+                for (var x = 0; x < NumberOfColumns; x++) {
+                    for (var y = 0; y < NumberOfRows; y++) {
+                        tickers.push({
+                            x: (x * TileWidth) + (TileWidth - TickerWidth) / 2,
+                            y: (y * TileHeight) + (TileHeight - TickerHeight) / 2
+                        })
+                    }
+                }
+                grid = new Array(NumberOfColumns);
+                for (var row_y = 0; row_y < NumberOfRows; row_y++) {
+                    grid[row_y] = new Array(NumberOfRows);
+                }
+
+                for (var col_x = 0; col_x < NumberOfColumns; col_x++) {
+                    for (var row_y = 0; row_y < NumberOfRows; row_y++) {
+                        grid[col_x][row_y] = 0;
+                    }
+                }
+                resetGrid();
+                update();
+            }
+
+            function populateGridSection(startColX, startRowY, data) {
+                for (var c = 0; c < 10; c++) {
+                    for (var r = 0; r < 10; r++) {
+                        grid[startColX + c][startRowY + r] = data[c][r];
+                    }
+                }
+            }
+
+            function update() {
+                //
+                // I don't recommend relying on this as a full time accurate
+                // clock BUT a bit of messing around: average time taken for 
+                // the functionality over 45000 runs is 26.5 ms.
+                // so will this make it run consistently closer to 1000ms?
+                //
+                if (Date.now() - start > 973.5) {
+                    let d = new Date();
+                    let s = d.getSeconds();
+                    currentTickerAngle = angles[s];
+
+                    let hours = d.getHours();
+                    let minutes = d.getMinutes();
+                    let aOrP = hours >= 12 ? 'P' : 'A'
+                    let hoursIn12Hour = hours == 12 ? 12 : hours % 12;
+                    let leftHours = hoursIn12Hour > 9 ? 1 : 0;
+                    let rightHours = hoursIn12Hour > 9 ? parseInt(hoursIn12Hour.toString().substring(1, 2)) :
+                        parseInt(hoursIn12Hour.toString().substring(0, 1));
+                    // minutes less than 10 will be single digits
+                    let leftMinutes = minutes > 9 ? parseInt(minutes.toString().substring(0, 1)) : 0;
+                    let rightMinutes = minutes > 9 ? parseInt(minutes.toString().substring(1, 2)) : parseInt(
+                        minutes.toString().substring(0, 1));
+                    // top left hour
+                    populateGridSection(2, 1, digits[leftHours]);
+                    // top right hour
+                    populateGridSection(13, 1, digits[rightHours]);
+                    // middle left minute
+                    populateGridSection(2, 12, digits[leftMinutes]);
+                    // middle right minute
+                    populateGridSection(13, 12, digits[rightMinutes]);
+                    // bottom left A or P
+                    // A is 10 wide, P is 8 wide
+                    populateGridSection(2, 23, characters[aOrP]);
+                    // bottom right always 'M' so this could be hard coded...
+                    populateGridSection(13, 23, characters['M']);
+
+                    if (panner) {
+                        let pp = pannerPositions[s];
+                        panner.positionX.value = pp.x;
+                        panner.positionY.value = pp.y;
+                        if (!isMuted) {
+                            if (s != 0) {
+                                tockElement.pause();
+                                tickElement.play();
+                            } else {
+                                tickElement.pause();
+                                tockElement.play();
+                            }
+                        } else {
+                            tickElement.pause();
+                            tockElement.pause();
+                        }
+
+                    }
+                    render();
+                    start = Date.now();
+                }
+
+                requestAnimationFrame(update);
+            }
+
+            function renderTimeWithTickersOnly() {
+                for (var col_x = 0; col_x < NumberOfColumns; col_x++) {
+                    for (var row_y = 0; row_y < NumberOfRows; row_y++) {
+                        if (grid[col_x][row_y] == 1) {
+                            ctx.save();
+                            ctx.lineWidth = 2;
+                            ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
+                            ctx.shadowColor = "rgba(220, 220, 220, 1.0)";
+                            ctx.shadowBlur = TickerHeight * 2;
+                            ctx.shadowOffsetX = TickerWidth;
+                            ctx.shadowOffsetY = TickerHeight;
+                            ctx.fillRect((col_x * TileWidth) + (TileWidth - TickerWidth) / 2, (row_y *
+                                    TileHeight) + (TileHeight - TickerHeight) / 2, TickerWidth,
+                                TickerHeight);
+                            ctx.restore();
+                        } else {
+                            ctx.lineWidth = 1.0;
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+                            ctx.save();
+                            ctx.translate(((col_x * TileWidth) + (TileWidth - TickerWidth) / 2) + (TickerWidth /
+                                2), ((row_y * TileHeight) + (TileHeight - TickerHeight) / 2) + (
+                                TickerHeight / 2));
+                            ctx.rotate(currentTickerAngle);
+                            ctx.fillRect(-TickerWidth / 2, -TickerHeight / 2, TickerWidth, TickerHeight);
+                            ctx.restore();
+                        }
+                    }
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, cvs.width, cvs.height);
+                ctx.fillStyle = 'rgba(0, 0, 0, 1.0)';
+                ctx.fillRect(0, 0, cvs.width, cvs.height);
+                renderTimeWithTickersOnly();
+            }
+            let start = Date.now();
+            visualSetup();
+        });
+    </script>
+
+</body>
+
+</html>
